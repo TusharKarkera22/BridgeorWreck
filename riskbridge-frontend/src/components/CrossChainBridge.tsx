@@ -96,7 +96,7 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
     const amount = parseUnits(depositAmount, 18); // RiskToken has 18 decimals
     
     // Check if approval is needed
-    if (!riskTokenAllowance || riskTokenAllowance < amount) {
+    if (!riskTokenAllowance || (riskTokenAllowance as bigint) < amount) {
       setErrorMessage('Please approve RiskToken spending first');
       return;
     }
@@ -135,8 +135,8 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
     }
   }, [isApprovalConfirmed, refetchAllowance]);
 
-  const needsApproval = !riskTokenAllowance || riskTokenAllowance < parseUnits(depositAmount, 18);
-  const hasInsufficientBalance = !riskTokenBalance || riskTokenBalance.value < parseUnits(depositAmount, 18);
+  const needsApproval = !riskTokenAllowance || (riskTokenAllowance as bigint) < parseUnits(depositAmount, 18);
+  const hasInsufficientBalance = !riskTokenBalance || (riskTokenBalance.value as bigint) < parseUnits(depositAmount, 18);
 
   const handlePlaceCrossChainBet = async () => {
     if (!address || !userBalance || userBalance === 0n) {
@@ -193,10 +193,10 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
           <div className="bg-gray-800 p-4 rounded border border-gray-700">
             <h3 className="text-blue-400 font-semibold mb-2">🔗 Current Chain</h3>
             <p className="text-sm text-gray-300">
-              {chain?.name || 'Unknown Chain'} - Balance: {userBalance ? formatUnits(userBalance, 18) : '0'} RISK
+              {chain?.name || 'Unknown Chain'} - Balance: {userBalance ? formatUnits(userBalance as bigint, 18) : '0'} RISK
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              Wallet RISK: {riskTokenBalance?.value ? formatUnits(riskTokenBalance.value, 18) : '0'} RISK
+              Wallet RISK: {riskTokenBalance?.value ? formatUnits(riskTokenBalance.value as bigint, 18) : '0'} RISK
             </p>
             <div className="mt-2 flex gap-2">
               <button
@@ -269,12 +269,32 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
           <div className="bg-gray-800 p-4 rounded border border-gray-700">
             <h3 className="text-yellow-400 font-semibold mb-2">🎲 Cross-Chain Betting</h3>
             <div className="space-y-3">
+              {/* Show deposit requirement if no balance */}
+              {(!userBalance || userBalance === 0n) && (
+                <div className="bg-orange-900/20 border border-orange-500/30 p-3 rounded">
+                  <p className="text-orange-400 text-sm font-semibold mb-1">⚠️ Deposit Required</p>
+                  <p className="text-orange-300 text-xs">
+                    You must deposit RISK tokens first before placing bets. Your deposited tokens will be used for betting.
+                  </p>
+                </div>
+              )}
+              
+              {/* Show current deposit balance */}
+              {userBalance && userBalance > 0n && (
+                <div className="bg-green-900/20 border border-green-500/30 p-2 rounded">
+                  <p className="text-green-400 text-xs">
+                    💰 Deposited Balance: {formatUnits(userBalance as bigint, 18)} RISK
+                  </p>
+                </div>
+              )}
+              
               <div>
                 <label className="text-sm text-gray-300 block mb-1">Leverage Multiplier:</label>
                 <select
                   value={leverageMultiplier}
                   onChange={(e) => setLeverageMultiplier(Number(e.target.value))}
                   className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white text-sm"
+                  disabled={!userBalance || userBalance === 0n}
                 >
                   <option value={2}>2x Leverage</option>
                   <option value={3}>3x Leverage</option>
@@ -282,6 +302,14 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
                   <option value={10}>10x Leverage</option>
                 </select>
               </div>
+              
+              {/* Show bet amount calculation */}
+              {userBalance && userBalance > 0n && (
+                <div className="text-xs text-gray-400 bg-gray-700/50 p-2 rounded">
+                  <p>Bet Amount: {formatUnits((userBalance as bigint) / BigInt(leverageMultiplier), 18)} RISK</p>
+                  <p>Potential Win: {formatUnits(((userBalance as bigint) / BigInt(leverageMultiplier)) * BigInt(leverageMultiplier - 1), 18)} RISK</p>
+                </div>
+              )}
               
               {errorMessage && (
                 <div className="text-red-400 text-sm bg-red-900/20 p-2 rounded">
@@ -296,6 +324,8 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
               >
                 {isPlacingBet ? (
                   '⏳ Placing Cross-Chain Bet...'
+                ) : !userBalance || userBalance === 0n ? (
+                  '🔒 Deposit RISK First'
                 ) : (
                   `🎲 Place ${leverageMultiplier}x Cross-Chain Bet`
                 )}
@@ -318,12 +348,19 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
           <div className="bg-blue-900/20 p-4 rounded border border-blue-500/30">
             <h4 className="text-blue-400 font-semibold mb-2">📋 How it works:</h4>
             <ol className="text-sm text-gray-300 space-y-1 list-decimal list-inside">
-              <li>Choose your leverage multiplier</li>
-              <li>Place a cross-chain bet from Base or Arbitrum</li>
-              <li>Win or lose based on Pyth Entropy randomness</li>
-              <li>Receive payouts directly to your connected wallet</li>
-              <li>Cross-chain messages handled automatically via LayerZero</li>
+              <li><strong>Deposit RISK tokens</strong> - First, approve and deposit your RISK tokens into the contract</li>
+              <li><strong>Choose leverage</strong> - Select your leverage multiplier (2x to 10x)</li>
+              <li><strong>Place cross-chain bet</strong> - Bet amount = Deposit ÷ Leverage multiplier</li>
+              <li><strong>Pyth Entropy decides</strong> - 50/50 chance to win or lose based on randomness</li>
+              <li><strong>Win/Lose outcome</strong> - Win: Keep deposit + gain bet amount | Lose: Lose bet amount from deposit</li>
+              <li><strong>Cross-chain messaging</strong> - Results communicated via LayerZero automatically</li>
             </ol>
+            <div className="mt-3 p-2 bg-yellow-900/20 border border-yellow-500/30 rounded">
+              <p className="text-yellow-400 text-xs font-semibold">💡 Example:</p>
+              <p className="text-yellow-300 text-xs">
+                Deposit 100 RISK → Choose 5x leverage → Bet 20 RISK → Win: Keep 100 + gain 20 = 120 RISK | Lose: 100 - 20 = 80 RISK
+              </p>
+            </div>
           </div>
         </div>
       </div>

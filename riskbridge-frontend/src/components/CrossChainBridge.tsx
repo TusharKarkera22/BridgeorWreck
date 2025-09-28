@@ -3,6 +3,7 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadCont
 import { parseEther, formatUnits, parseUnits, maxUint256 } from 'viem';
 import { baseSepolia, arbitrumSepolia } from 'wagmi/chains';
 import { CROSSCHAIN_BRIDGE_ABI } from '../contracts/CrossChainRiskBridge';
+import { RISK_TOKEN_ABI } from '../contracts/RiskToken';
 import { CONTRACT_ADDRESSES, LAYERZERO_CHAIN_IDS } from '../config/wagmi';
 
 interface CrossChainBridgeProps {
@@ -48,33 +49,22 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
     query: { enabled: !!address && !!contractAddress }
   });
 
-  // Get user's USDC balance
-  const { data: usdcBalance } = useBalance({
+  // Get user's RiskToken balance
+  const { data: riskTokenBalance } = useBalance({
     address: address,
     token: tokenAddress as `0x${string}`,
   });
 
-  // Read user's USDC allowance for the cross-chain contract
-  const { data: usdcAllowance, refetch: refetchAllowance } = useReadContract({
+  // Read user's RiskToken allowance for the cross-chain contract
+  const { data: riskTokenAllowance, refetch: refetchAllowance } = useReadContract({
     address: tokenAddress as `0x${string}`,
-    abi: [
-      {
-        "inputs": [
-          {"internalType": "address", "name": "owner", "type": "address"},
-          {"internalType": "address", "name": "spender", "type": "address"}
-        ],
-        "name": "allowance",
-        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-        "stateMutability": "view",
-        "type": "function"
-      }
-    ],
+    abi: RISK_TOKEN_ABI,
     functionName: 'allowance',
     args: address && contractAddress ? [address as `0x${string}`, contractAddress as `0x${string}`] : undefined,
     query: { enabled: !!address && !!contractAddress && !!tokenAddress }
   });
 
-  const handleApproveUSDC = async () => {
+  const handleApproveRiskToken = async () => {
     if (!address || !contractAddress || !tokenAddress) {
       setErrorMessage('Missing required addresses');
       return;
@@ -86,24 +76,13 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
     try {
       await writeApproval({
         address: tokenAddress as `0x${string}`,
-        abi: [
-          {
-            "inputs": [
-              {"internalType": "address", "name": "spender", "type": "address"},
-              {"internalType": "uint256", "name": "amount", "type": "uint256"}
-            ],
-            "name": "approve",
-            "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-            "stateMutability": "nonpayable",
-            "type": "function"
-          }
-        ],
+        abi: RISK_TOKEN_ABI,
         functionName: 'approve',
         args: [contractAddress as `0x${string}`, maxUint256],
       });
     } catch (error: any) {
-      console.error('Approval failed:', error);
-      setErrorMessage(`Approval failed: ${error.message || 'Unknown error'}`);
+      console.error('Approval error:', error);
+      setErrorMessage(error.message || 'Failed to approve RiskToken');
       setIsApproving(false);
     }
   };
@@ -114,11 +93,11 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
       return;
     }
 
-    const amount = parseUnits(depositAmount, 6); // USDC has 6 decimals
+    const amount = parseUnits(depositAmount, 18); // RiskToken has 18 decimals
     
     // Check if approval is needed
-    if (!usdcAllowance || usdcAllowance < amount) {
-      setErrorMessage('Please approve USDC spending first');
+    if (!riskTokenAllowance || riskTokenAllowance < amount) {
+      setErrorMessage('Please approve RiskToken spending first');
       return;
     }
 
@@ -156,8 +135,8 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
     }
   }, [isApprovalConfirmed, refetchAllowance]);
 
-  const needsApproval = !usdcAllowance || usdcAllowance < parseUnits(depositAmount, 6);
-  const hasInsufficientBalance = !usdcBalance || usdcBalance.value < parseUnits(depositAmount, 6);
+  const needsApproval = !riskTokenAllowance || riskTokenAllowance < parseUnits(depositAmount, 18);
+  const hasInsufficientBalance = !riskTokenBalance || riskTokenBalance.value < parseUnits(depositAmount, 18);
 
   const handlePlaceCrossChainBet = async () => {
     if (!address || !userBalance || userBalance === 0n) {
@@ -214,10 +193,10 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
           <div className="bg-gray-800 p-4 rounded border border-gray-700">
             <h3 className="text-blue-400 font-semibold mb-2">🔗 Current Chain</h3>
             <p className="text-sm text-gray-300">
-              {chain?.name || 'Unknown Chain'} - Balance: {userBalance ? formatUnits(userBalance, 6) : '0'} USDC
+              {chain?.name || 'Unknown Chain'} - Balance: {userBalance ? formatUnits(userBalance, 18) : '0'} RISK
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              Wallet USDC: {usdcBalance?.value ? formatUnits(usdcBalance.value, 6) : '0'} USDC
+              Wallet RISK: {riskTokenBalance?.value ? formatUnits(riskTokenBalance.value, 18) : '0'} RISK
             </p>
             <div className="mt-2 flex gap-2">
               <button
@@ -245,10 +224,10 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
 
           {/* Deposit Section */}
           <div className="bg-gray-800 p-4 rounded border border-gray-700">
-            <h3 className="text-green-400 font-semibold mb-2">💰 Deposit USDC</h3>
+            <h3 className="text-green-400 font-semibold mb-2">💰 Deposit RISK</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-sm text-gray-300 block mb-1">Amount (USDC):</label>
+                <label className="text-sm text-gray-300 block mb-1">Amount (RISK):</label>
                 <input
                   type="number"
                   value={depositAmount}
@@ -262,17 +241,17 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
               
               {hasInsufficientBalance && (
                 <div className="text-red-400 text-xs">
-                  ⚠️ Insufficient USDC balance
+                  ⚠️ Insufficient RISK balance
                 </div>
               )}
               
               {needsApproval ? (
                 <button
-                  onClick={handleApproveUSDC}
+                  onClick={handleApproveRiskToken}
                   disabled={isApproving || hasInsufficientBalance}
                   className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-4 py-2 rounded text-sm w-full font-semibold"
                 >
-                  {isApproving ? '⏳ Approving...' : '✅ Approve USDC'}
+                  {isApproving ? '⏳ Approving...' : '✅ Approve RISK'}
                 </button>
               ) : (
                 <button
@@ -280,7 +259,7 @@ export const CrossChainBridge: React.FC<CrossChainBridgeProps> = ({ onClose }) =
                   disabled={isDepositing || hasInsufficientBalance}
                   className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white px-4 py-2 rounded text-sm w-full font-semibold"
                 >
-                  {isDepositing ? '⏳ Depositing...' : '💰 Deposit USDC'}
+                  {isDepositing ? '⏳ Depositing...' : '💰 Deposit RISK'}
                 </button>
               )}
             </div>

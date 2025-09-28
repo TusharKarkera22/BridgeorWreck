@@ -11,12 +11,12 @@ export const config = getDefaultConfig({
 // Contract addresses for different chains
 export const CONTRACT_ADDRESSES = {
   [baseSepolia.id]: {
-    bridge: '0x88A2AaDe4666903fDab0d9BC986Ed8cad521C3b8', // CrossChainRiskBridge on Base Sepolia
-    token: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC token address on Base Sepolia
+    bridge: '0x91Ac61f7F9c2c06Fe3887987bD494483B39492AB', // CrossChainRiskBridge on Base Sepolia
+    token: '0x05b601DD38C04911bf86F067e0Fb6CfF8Bfc961b', // RiskToken address on Base Sepolia
   },
   [arbitrumSepolia.id]: {
-    bridge: '0x9F1A1E32EeBEdB21f3Ca34200A1DE5E98a6f7f9C', // CrossChainRiskBridge on Arbitrum Sepolia
-    token: '0xf3c3351d6bd0098eeb33ca8f830faf2a141ea2e1', // USDC token address on Arbitrum Sepolia
+    bridge: '0xE6E6A79B8cdc5b5787A2df5A026ed513903BB6e5', // CrossChainRiskBridge on Arbitrum Sepolia
+    token: '0x263A11de756e2595FCA1bAE1fb15ba32b77974dd', // RiskToken address on Arbitrum Sepolia
   },
 };
 
